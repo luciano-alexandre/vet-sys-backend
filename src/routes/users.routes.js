@@ -2,12 +2,17 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import {
-  listUsers, getUser, createUser, updateUser, updateUserPassword, deleteUser
+  listUsers, getUser, createUser, updateUser, updateUserPassword, deleteUser,
+  updateMe, updateMyPassword
 } from "../controllers/users.controller.js";
 
 const router = Router();
 
-// Somente ADMIN gerencia usuários
+/** ✅ ROTAS DO PRÓPRIO USUÁRIO (ADMIN e VETERINARIO) */
+router.put("/me", requireAuth, asyncHandler(updateMe));
+router.put("/me/password", requireAuth, asyncHandler(updateMyPassword));
+
+/** ✅ A PARTIR DAQUI, SOMENTE ADMIN */
 router.use(requireAuth, requireRole("ADMIN"));
 
 router.get("/", asyncHandler(listUsers));

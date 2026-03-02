@@ -2,6 +2,7 @@ import { query } from "../config/db.js";
 import { hashPassword } from "../utils/password.js";
 import { badRequest } from "../middlewares/validate.js";
 
+/** ADMIN */
 export async function listUsers(req, res) {
   const { rows } = await query(
     `SELECT id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at
@@ -121,4 +122,65 @@ export async function deleteUser(req, res) {
   if (!rowCount) return res.status(404).json({ error: "Usuário não encontrado." });
 
   return res.json({ ok: true });
+}
+
+/** ✅ NOVO: VETERINARIO (ou qualquer autenticado) atualiza o PRÓPRIO perfil */
+export async function updateMe(req, res) {
+  const id = req.user.id;
+  const { nome, email, crmv, telefone } = req.body || {};
+
+  const { rows: currentRows } = await query(
+    `SELECT id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at
+     FROM vet.usuario WHERE id = $1`,
+    [id]
+  );
+  if (!currentRows.length) return res.status(404).json({ error: "Usuário não encontrado." });
+  const current = currentRows[0];
+
+  // ⚠️ Veterinário NÃO pode mudar perfil/ativo por aqui
+  // Só permite atualizar nome/email/telefone e (se for veterinário) crmv
+  const nextNome = (nome ?? current.nome).trim();
+  const nextEmail = (email ?? current.email).trim().toLowerCase();
+  const nextTelefone = telefone === undefined ? current.telefone : (telefone?.trim() || null);
+
+  let nextCrmv = current.crmv;
+  if (current.perfil === "VETERINARIO") {
+    nextCrmv = crmv === undefined ? current.crmv : (String(crmv || "").trim() || null);
+    if (!String(nextCrmv || "").trim()) {
+      throw badRequest("CRMV é obrigatório para veterinário.");
+    }
+  }
+
+  const { rows } = await query(
+    `UPDATE vet.usuario
+     SET nome = $1,
+         email = $2,
+         telefone = $3,
+         crmv = $4,
+         updated_by = $5
+     WHERE id = $6
+     RETURNING id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at`,
+    [nextNome, nextEmail, nextTelefone, nextCrmv, id, id]
+  );
+
+  return res.json(rows[0]);
+}
+
+/** ✅ NOVO: VETERINARIO (ou qualquer autenticado) atualiza a PRÓPRIA senha */
+export async function updateMyPassword(req, res) {
+  const id = req.user.id;
+  const { senha } = req.body || {};
+  if (!senha?.trim() || senha.length < 6) throw badRequest("Senha deve ter no mínimo 6 caracteres.");
+
+  const hash = await hashPassword(senha);
+
+  await query(
+    `UPDATE vet.usuario
+     SET senha_hash = $1, updated_by = $2
+     WHERE id = $2`,
+    [hash, id]
+  );
+
+  // pode ser 204 ou {ok:true}. Vou manter padrão mais “API”:
+  return res.status(204).send();
 }
