@@ -12,7 +12,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    // coloque o domínio do seu front em produção também
+    "https://vet-sys-frontend.vercel.app"
   ],
   credentials: true,
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
