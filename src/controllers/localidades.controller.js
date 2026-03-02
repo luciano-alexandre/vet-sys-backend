@@ -1,4 +1,4 @@
-import { pool } from "../config/db.js";
+import pool  from "../config/db.js";
 
 export async function listUfs(req, res) {
   try {
