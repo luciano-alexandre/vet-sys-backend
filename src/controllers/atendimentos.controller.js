@@ -1,4 +1,4 @@
-import { query } from "../config/db.js";
+import { query, getClient } from "../config/db.js";
 import { badRequest } from "../middlewares/validate.js";
 
 const TIPOS_CONCENTRADO = new Set([
@@ -589,8 +589,7 @@ export async function createAtendimento(req, res) {
   if (!d.animal_id) throw badRequest("animal_id é obrigatório.");
   if (!d.veterinario_id) throw badRequest("veterinario_id é obrigatório.");
 
-  const client = await (await import("../config/db.js")).pool.connect();
-  try {
+  const client = await getClient(); try {
     await client.query("BEGIN");
 
     const vetCheck = await client.query(
@@ -1104,8 +1103,7 @@ export async function upsertManejoNutricional(req, res) {
   const { id } = req.params;
   const payload = req.body || {};
 
-  const client = await (await import("../config/db.js")).pool.connect();
-  try {
+  const client = await getClient(); try {
     await client.query("BEGIN");
     const row = await upsertManejoNutricionalTx(client, id, payload);
     await client.query("COMMIT");
