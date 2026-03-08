@@ -1187,6 +1187,26 @@ export async function addParticipante(req, res) {
   return res.status(201).json(rows[0]);
 }
 
+export async function updateParticipante(req, res) {
+  const { id, participanteId } = req.params;
+  const { nome, papel, observacao } = req.body || {};
+  if (!nome?.trim() || !papel?.trim()) throw badRequest("nome e papel são obrigatórios.");
+
+  const { rows } = await query(
+    `UPDATE vet.atendimento_participante
+     SET nome = $1,
+         papel = $2,
+         observacao = $3
+     WHERE id = $4
+       AND atendimento_id = $5
+     RETURNING *`,
+    [nome.trim(), papel.trim(), observacao?.trim() || null, participanteId, id]
+  );
+
+  if (!rows.length) return res.status(404).json({ error: "Participante não encontrado." });
+  return res.json(rows[0]);
+}
+
 export async function removeParticipante(req, res) {
   const { participanteId } = req.params;
   const { rowCount } = await query(`DELETE FROM vet.atendimento_participante WHERE id = $1`, [

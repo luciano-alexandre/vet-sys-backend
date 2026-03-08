@@ -5,7 +5,7 @@ import {
   createAtendimento, listAtendimentos, getAtendimento, updateAtendimento, deleteAtendimento,
   upsertManejoSanitario, upsertManejoNutricional, upsertAmbienteEpidemiologia,
   upsertExameFisico, upsertExamesComplementares, upsertConduta,
-  listParticipantes, addParticipante, removeParticipante
+  listParticipantes, addParticipante, updateParticipante, removeParticipante
 } from "../controllers/atendimentos.controller.js";
 
 const router = Router();
@@ -26,6 +26,7 @@ router.put("/:id/conduta", asyncHandler(upsertConduta));
 
 router.get("/:id/participantes", asyncHandler(listParticipantes));
 router.post("/:id/participantes", asyncHandler(addParticipante));
+router.put("/:id/participantes/:participanteId", asyncHandler(updateParticipante));
 router.delete("/:id/participantes/:participanteId", asyncHandler(removeParticipante));
 
 export default router;
