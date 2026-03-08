@@ -2,6 +2,29 @@ import { query } from "../config/db.js";
 import { hashPassword } from "../utils/password.js";
 import { badRequest } from "../middlewares/validate.js";
 
+const ASSINATURA_MAX_BYTES = 2 * 1024 * 1024; // 2MB
+const ASSINATURA_MIME_PERMITIDOS = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp"
+]);
+
+function parseAssinaturaBase64(input) {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+
+  const commaIdx = raw.indexOf(",");
+  const base64Part = commaIdx >= 0 ? raw.slice(commaIdx + 1) : raw;
+  const normalized = base64Part.replace(/\s+/g, "");
+  if (!normalized) return null;
+
+  try {
+    return Buffer.from(normalized, "base64");
+  } catch {
+    throw badRequest("Assinatura inválida.");
+  }
+}
+
 /** ADMIN */
 export async function listUsers(req, res) {
   const { rows } = await query(
@@ -127,10 +150,21 @@ export async function deleteUser(req, res) {
 /** ✅ NOVO: VETERINARIO (ou qualquer autenticado) atualiza o PRÓPRIO perfil */
 export async function updateMe(req, res) {
   const id = req.user.id;
-  const { nome, email, crmv, telefone } = req.body || {};
+  const {
+    nome,
+    email,
+    crmv,
+    telefone,
+    assinatura_base64,
+    assinatura_nome,
+    assinatura_mime,
+    remover_assinatura
+  } = req.body || {};
 
   const { rows: currentRows } = await query(
-    `SELECT id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at
+    `SELECT id, nome, email, perfil, ativo, crmv, telefone,
+            assinatura, assinatura_nome, assinatura_mime,
+            created_at, updated_at
      FROM vet.usuario WHERE id = $1`,
     [id]
   );
@@ -151,16 +185,57 @@ export async function updateMe(req, res) {
     }
   }
 
+  let nextAssinatura = current.assinatura;
+  let nextAssinaturaNome = current.assinatura_nome;
+  let nextAssinaturaMime = current.assinatura_mime;
+
+  if (remover_assinatura === true) {
+    nextAssinatura = null;
+    nextAssinaturaNome = null;
+    nextAssinaturaMime = null;
+  } else if (assinatura_base64 !== undefined) {
+    const buffer = parseAssinaturaBase64(assinatura_base64);
+    if (!buffer || !buffer.length) throw badRequest("Assinatura inválida.");
+    if (buffer.length > ASSINATURA_MAX_BYTES) {
+      throw badRequest("A assinatura deve ter no máximo 2MB.");
+    }
+
+    const mime = String(assinatura_mime || "").trim().toLowerCase();
+    if (!ASSINATURA_MIME_PERMITIDOS.has(mime)) {
+      throw badRequest("Formato de assinatura inválido. Use PNG, JPG/JPEG ou WEBP.");
+    }
+
+    nextAssinatura = buffer;
+    nextAssinaturaNome = String(assinatura_nome || "assinatura").trim().slice(0, 255) || "assinatura";
+    nextAssinaturaMime = mime;
+  }
+
   const { rows } = await query(
     `UPDATE vet.usuario
      SET nome = $1,
          email = $2,
          telefone = $3,
          crmv = $4,
-         updated_by = $5
-     WHERE id = $6
-     RETURNING id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at`,
-    [nextNome, nextEmail, nextTelefone, nextCrmv, id, id]
+         assinatura = $5,
+         assinatura_nome = $6,
+         assinatura_mime = $7,
+         updated_by = $8
+     WHERE id = $9
+     RETURNING id, nome, email, perfil, ativo, crmv, telefone,
+               assinatura_nome, assinatura_mime,
+               (assinatura IS NOT NULL) AS tem_assinatura,
+               created_at, updated_at`,
+    [
+      nextNome,
+      nextEmail,
+      nextTelefone,
+      nextCrmv,
+      nextAssinatura,
+      nextAssinaturaNome,
+      nextAssinaturaMime,
+      id,
+      id
+    ]
   );
 
   return res.json(rows[0]);

@@ -938,7 +938,10 @@ export async function getAtendimento(req, res) {
       u.nome AS veterinario_nome,
       u.crmv AS veterinario_crmv,
       u.email AS veterinario_email,
-      u.telefone AS veterinario_telefone
+      u.telefone AS veterinario_telefone,
+      u.assinatura AS veterinario_assinatura,
+      u.assinatura_mime AS veterinario_assinatura_mime,
+      u.assinatura_nome AS veterinario_assinatura_nome
     FROM vet.atendimento a
     LEFT JOIN vet.animal an ON an.id = a.animal_id
     LEFT JOIN vet.responsavel r ON r.id = an.responsavel_id
@@ -951,8 +954,21 @@ export async function getAtendimento(req, res) {
 
   const fallback = await query(fallbackSql, [id]);
   const f = fallback.rows[0] || {};
+  const veterinarioAssinaturaBase64 = f.veterinario_assinatura
+    ? f.veterinario_assinatura.toString("base64")
+    : null;
 
   detalhado = { ...(f || {}), ...(detalhado || {}) };
+  if (veterinarioAssinaturaBase64) {
+    detalhado.veterinario_assinatura_base64 = veterinarioAssinaturaBase64;
+  }
+  if (f.veterinario_assinatura_mime) {
+    detalhado.veterinario_assinatura_mime = f.veterinario_assinatura_mime;
+  }
+  if (f.veterinario_assinatura_nome) {
+    detalhado.veterinario_assinatura_nome = f.veterinario_assinatura_nome;
+  }
+  delete detalhado.veterinario_assinatura;
 
   const [sanit, amb, fis, exComp, cond, parts, manejoNutricional] = await Promise.all([
     query(`SELECT * FROM vet.atendimento_manejo_sanitario WHERE atendimento_id = $1`, [id]),
@@ -987,6 +1003,9 @@ export async function getAtendimento(req, res) {
     veterinario_crmv: f.veterinario_crmv ?? null,
     veterinario_email: f.veterinario_email ?? null,
     veterinario_telefone: f.veterinario_telefone ?? null,
+    veterinario_assinatura_base64: veterinarioAssinaturaBase64,
+    veterinario_assinatura_mime: f.veterinario_assinatura_mime ?? null,
+    veterinario_assinatura_nome: f.veterinario_assinatura_nome ?? null,
 
     responsavel_nome: f.responsavel_nome ?? null,
     responsavel_telefone: f.responsavel_telefone ?? null,

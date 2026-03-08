@@ -42,10 +42,20 @@ export async function login(req, res) {
 
 export async function me(req, res) {
   const { rows } = await query(
-    `SELECT id, nome, email, perfil, ativo, crmv, telefone, created_at, updated_at
+    `SELECT id, nome, email, perfil, ativo, crmv, telefone,
+            assinatura, assinatura_nome, assinatura_mime,
+            created_at, updated_at
      FROM vet.usuario WHERE id = $1`,
     [req.user.id]
   );
   if (!rows.length) return res.status(404).json({ error: "Usuário não encontrado." });
-  return res.json(rows[0]);
+  const user = rows[0];
+  const assinaturaBase64 = user.assinatura ? user.assinatura.toString("base64") : null;
+  const { assinatura, ...safeUser } = user;
+
+  return res.json({
+    ...safeUser,
+    tem_assinatura: Boolean(assinaturaBase64),
+    assinatura_base64: assinaturaBase64
+  });
 }
